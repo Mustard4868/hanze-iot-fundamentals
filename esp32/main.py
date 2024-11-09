@@ -8,18 +8,20 @@ import _thread
 import ntptime
 
 """ENVIRONMENT"""
-def get_env(key):
+def get_env(env_key):
     with open('.env', 'r') as f:
-        envs = dict([line.strip().split('=') for line in f.readlines() if line.strip()])
-        return envs[key]
+        for line in f:
+            if env_key in line:
+                key_value = line.split('=')[1].strip()
+                return key_value
 
 MQTT_BROKER = '192.168.2.149'
-MQTT_PORT = 1883
-MQTT_USER = 'user1'
-MQTT_TOPIC = 'esp32/bme280'
-WIFI_SSID = get_env('WIFI_SSID')
-WIFI_PASS = get_env('WIFI_PASS')
-MQTT_PASS = get_env('MQTT_PASS')
+MQTT_PORT   = 1883
+MQTT_USER   = 'user1'
+MQTT_TOPIC  = 'esp32/bme280'
+WIFI_SSID   = get_env('WIFI_SSID')
+WIFI_PASS   = get_env('WIFI_PASS')
+MQTT_PASS   = get_env('MQTT_PASS')
 
 """CONNECT TO WIFI"""
 wlan = WLAN(STA_IF)
