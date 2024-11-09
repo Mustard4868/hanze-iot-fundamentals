@@ -1,1 +1,1 @@
-# boot.py -- run on boot-up
+# does anybody ever put anything here?
