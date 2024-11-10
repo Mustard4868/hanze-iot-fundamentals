@@ -7,6 +7,9 @@ import utime
 import _thread
 import ntptime
 
+id = machine.unique_id()
+device_id = '{:02x}{:02x}{:02x}{:02x}'.format(id[0], id[1], id[2], id[3])
+
 """ENVIRONMENT"""
 def get_env(env_key):
     with open('.env', 'r') as f:
@@ -49,6 +52,7 @@ def get_bme280_data():
     pressure = bme280.pressure[:-3]         # Remove the trailing 'hPa' from the pressure string
     timestamp = utime.localtime()
     data = {
+        'Device_ID': device_id,
         'Temperature': temperature,
         'Humidity': humidity,
         'Pressure': pressure,

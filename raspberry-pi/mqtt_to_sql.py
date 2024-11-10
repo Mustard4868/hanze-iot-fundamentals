@@ -4,6 +4,9 @@ import pymysql
 import paho.mqtt.client as mqtt
 import time
 from dotenv import load_dotenv
+from threading import Thread
+from azure.iot.device import IoTHubDeviceClient, Message
+from azure.iot.device.exceptions import *
 
 """ ENVIRONMENT """
 load_dotenv()
@@ -20,6 +23,8 @@ MQTT_TOPIC      = "esp32/bme280"
 MQTT_USER       = "user1"
 MQTT_PASSWORD   = os.getenv("MQTT_PASSWORD")
 
+IOTHUB_DEVICE_CONNECTION_STRING = os.getenv("IOTHUB_DEVICE_CONNECTION_STRING")
+
 def on_connect(client, userdata, flags, rc):
     print("Connected with result code " + str(rc))
     client.subscribe(MQTT_TOPIC)
@@ -33,23 +38,52 @@ def on_message(client, userdata, msg):
     pressure = data.get("Pressure")
     humidity = data.get("Humidity")
     timestamp = data.get("Timestamp")
+    device_id = data.get("Device_ID")
 
     try:
         connection = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=DB_NAME, connect_timeout=60)
         cursor = connection.cursor()
-        cursor.execute(f"INSERT INTO {DB_TABLE} (temperature, pressure, humidity, timestamp) VALUES ({temperature}, {pressure}, {humidity}, '{timestamp}')")
+        cursor.execute(f"INSERT INTO {DB_TABLE} (device_id, temperature, pressure, humidity, timestamp) VALUES ({device_id}, {temperature}, {pressure}, {humidity}, '{timestamp}')")
         connection.commit()
         connection.close()
     except Exception as e:
         print(e)
 
-try:
-    client = mqtt.Client()
-    client.on_connect = on_connect
-    client.on_message = on_message
-    client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
-    client.connect(MQTT_BROKER, MQTT_PORT, 60)
-except Exception as e:
-    print(e)
+def mqtt_to_localdb():
+    try:
+        client = mqtt.Client()
+        client.on_connect = on_connect
+        client.on_message = on_message
+        client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
+        client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    except Exception as e:
+        print(e)
 
-client.loop_forever()
+    client.loop_forever()
+
+def localdb_to_azure():
+    try:
+        client = IoTHubDeviceClient.create_from_connection_string(IOTHUB_DEVICE_CONNECTION_STRING, connection_retry=False)
+        client.connect()
+    except Exception as e:
+        print(e)
+
+    while client.connected:
+        try:
+            connection = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=DB_NAME, connect_timeout=60)
+            cursor = connection.cursor(pymysql.cursors.DictCursor)
+            cursor.execute(f"SELECT * FROM {DB_TABLE} WHERE sync = FALSE")
+            rows = cursor.fetchall()
+
+            for row in rows:
+                message = Message(json.dumps(row))
+                client.send_message(message)
+                cursor.execute(f"UPDATE {DB_TABLE} SET sync = TRUE WHERE row_id = {row['row_id']}")
+                connection.commit()
+
+            connection.close()
+        except Exception as e:
+            print(e)
+
+Thread(target=mqtt_to_localdb).start()
+Thread(target=localdb_to_azure).start()
