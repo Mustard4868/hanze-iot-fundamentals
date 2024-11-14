@@ -66,11 +66,11 @@ def sync_to_azure():
         try:
             connection = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=DB_NAME, connect_timeout=60)
             cursor = connection.cursor()
-            cursor.execute(f"SELECT * FROM {DB_TABLE} WHERE synced = 0")
+            cursor.execute(f"SELECT * FROM {DB_TABLE} WHERE sync = 0")
             data = cursor.fetchall()
             client = IoTHubDeviceClient.create_from_connection_string(IOTHUB_DEVICE_CONNECTION_STRING)
             for row in data:
-                cursor.execute(f"UPDATE {DB_TABLE} SET synced = 1 WHERE id = {row[0]}")
+                cursor.execute(f"UPDATE {DB_TABLE} SET sync = 1 WHERE id = {row[0]}")
                 connection.commit()
             connection.close()
         except Exception as e:
