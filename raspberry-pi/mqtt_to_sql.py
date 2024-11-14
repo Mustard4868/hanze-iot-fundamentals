@@ -43,7 +43,9 @@ def on_message(client, userdata, msg):
     try:
         connection = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=DB_NAME, connect_timeout=60)
         cursor = connection.cursor()
-        cursor.execute(f"INSERT INTO {DB_TABLE} (device_id, temperature, pressure, humidity, timestamp) VALUES ({device_id}, {temperature}, {pressure}, {humidity}, '{timestamp}')")
+        query = f"INSERT INTO {DB_TABLE} (device_id, temperature, pressure, humidity, timestamp) VALUES (%s, %s, %s, %s, %s)"
+        values = (device_id, temperature, pressure, humidity, timestamp)
+        cursor.execute(query, values)
         connection.commit()
         connection.close()
     except Exception as e:
@@ -75,8 +77,15 @@ def sync_to_azure():
             connection.close()
         except Exception as e:
             print(e)
+        finally:
+            client.shutdown()
+            connection.close()
     
         time.sleep(60)
 
-Thread(target=mqtt_to_localdb).start()
-Thread(target=sync_to_azure).start()
+if __name__ == "__main__":
+    try:
+        Thread(target=mqtt_to_localdb).start()
+        Thread(target=sync_to_azure).start()
+    except Exception as e:
+        print(e)
