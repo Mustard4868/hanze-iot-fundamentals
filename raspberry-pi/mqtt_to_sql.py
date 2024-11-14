@@ -81,7 +81,7 @@ def localdb_to_azure():
                     message.content_encoding = "utf-8"
                     message.content_type = "application/json"
                     client.send_message(message)
-                    cursor.execute(f"UPDATE {DB_TABLE} SET sync = TRUE WHERE row_id = {row['row_id']}")
+                    cursor.execute(f"UPDATE {DB_TABLE} SET sync = TRUE WHERE id = {row['id']}")
                     connection.commit()
 
                 connection.close()
