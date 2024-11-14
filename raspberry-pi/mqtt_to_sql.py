@@ -75,6 +75,7 @@ def sync_to_azure():
                 cursor.execute(f"UPDATE {DB_TABLE} SET sync = 1 WHERE id = {row[0]}")
                 connection.commit()
             connection.close()
+            print(f"Synced {len(data)} records to Azure")
         except Exception as e:
             print(e)
         finally:
