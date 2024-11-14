@@ -85,7 +85,15 @@ def sync_to_azure():
 
 if __name__ == "__main__":
     try:
-        Thread(target=mqtt_to_localdb).start()
-        Thread(target=sync_to_azure).start()
+        mqtt_thread = Thread(target=mqtt_to_localdb)
+        azure_thread = Thread(target=sync_to_azure)
+
+        mqtt_thread.start()
+        azure_thread.start()
+
     except Exception as e:
         print(e)
+
+    finally:
+        mqtt_thread.join()
+        azure_thread.join()
