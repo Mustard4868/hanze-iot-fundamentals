@@ -61,35 +61,22 @@ def mqtt_to_localdb():
 
     client.loop_forever()
 
-def localdb_to_azure():
+def sync_to_azure():
     while True:
         try:
-            client = IoTHubDeviceClient.create_from_connection_string(IOTHUB_DEVICE_CONNECTION_STRING, connection_retry=False)
-            client.connect()
+            connection = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=DB_NAME, connect_timeout=60)
+            cursor = connection.cursor()
+            cursor.execute(f"SELECT * FROM {DB_TABLE} WHERE synced = 0")
+            data = cursor.fetchall()
+            client = IoTHubDeviceClient.create_from_connection_string(IOTHUB_DEVICE_CONNECTION_STRING)
+            for row in data:
+                cursor.execute(f"UPDATE {DB_TABLE} SET synced = 1 WHERE id = {row[0]}")
+                connection.commit()
+            connection.close()
         except Exception as e:
             print(e)
-
-        while client.connected:
-            try:
-                connection = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=DB_NAME, connect_timeout=60)
-                cursor = connection.cursor(pymysql.cursors.DictCursor)
-                cursor.execute(f"SELECT * FROM {DB_TABLE} WHERE sync = FALSE")
-                rows = cursor.fetchall()
-
-                for row in rows:
-                    message = Message(json.dumps(row))
-                    message.content_encoding = "utf-8"
-                    message.content_type = "application/json"
-                    client.send_message(message)
-                    cursor.execute(f"UPDATE {DB_TABLE} SET sync = TRUE WHERE id = {row['id']}")
-                    connection.commit()
-
-                connection.close()
-            except Exception as e:
-                print(e)
-        
-        time.sleep(10)
-        print("Retrying...")
+    
+        time.sleep(60)
 
 Thread(target=mqtt_to_localdb).start()
-Thread(target=localdb_to_azure).start()
+Thread(target=sync_to_azure).start()
