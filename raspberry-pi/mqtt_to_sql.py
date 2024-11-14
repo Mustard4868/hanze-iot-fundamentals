@@ -62,28 +62,34 @@ def mqtt_to_localdb():
     client.loop_forever()
 
 def localdb_to_azure():
-    try:
-        client = IoTHubDeviceClient.create_from_connection_string(IOTHUB_DEVICE_CONNECTION_STRING, connection_retry=False)
-        client.connect()
-    except Exception as e:
-        print(e)
-
-    while client.connected:
+    while True:
         try:
-            connection = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=DB_NAME, connect_timeout=60)
-            cursor = connection.cursor(pymysql.cursors.DictCursor)
-            cursor.execute(f"SELECT * FROM {DB_TABLE} WHERE sync = FALSE")
-            rows = cursor.fetchall()
-
-            for row in rows:
-                message = Message(json.dumps(row))
-                client.send_message(message)
-                cursor.execute(f"UPDATE {DB_TABLE} SET sync = TRUE WHERE row_id = {row['row_id']}")
-                connection.commit()
-
-            connection.close()
+            client = IoTHubDeviceClient.create_from_connection_string(IOTHUB_DEVICE_CONNECTION_STRING, connection_retry=False)
+            client.connect()
         except Exception as e:
             print(e)
+
+        while client.connected:
+            try:
+                connection = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=DB_NAME, connect_timeout=60)
+                cursor = connection.cursor(pymysql.cursors.DictCursor)
+                cursor.execute(f"SELECT * FROM {DB_TABLE} WHERE sync = FALSE")
+                rows = cursor.fetchall()
+
+                for row in rows:
+                    message = Message(json.dumps(row))
+                    message.content_encoding = "utf-8"
+                    message.content_type = "application/json"
+                    client.send_message(message)
+                    cursor.execute(f"UPDATE {DB_TABLE} SET sync = TRUE WHERE row_id = {row['row_id']}")
+                    connection.commit()
+
+                connection.close()
+            except Exception as e:
+                print(e)
+        
+        time.sleep(10)
+        print("Retrying...")
 
 Thread(target=mqtt_to_localdb).start()
 Thread(target=localdb_to_azure).start()
