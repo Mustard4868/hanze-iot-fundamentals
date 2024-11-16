@@ -75,7 +75,7 @@ class Mosquitto:
         humidity = data.get("Humidity")
         timestamp = data.get("Timestamp")
         device_id = data.get("Device_ID")
-        sync = azure.send_message(message)
+        sync = azure.send_message(data)
 
         self.mqtt_db.insert(
             device_id=device_id,
