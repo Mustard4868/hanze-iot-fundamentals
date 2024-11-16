@@ -11,13 +11,15 @@ from azure.iot.device.exceptions import *
 """ ENVIRONMENT """
 load_dotenv()
 
-DB_HOST         = "localhost"
+SERVER_IP = "192.168.2.149"
+
+DB_HOST         = SERVER_IP
 DB_USER         = "user1"
 DB_PASSWORD     = os.getenv("DB_PASSWORD")
 DB_NAME         = "bme280"
 DB_TABLE        = "sensors"
 
-MQTT_BROKER     = "localhost"
+MQTT_BROKER     = SERVER_IP
 MQTT_PORT       = 1883
 MQTT_TOPIC      = "esp32/bme280"
 MQTT_USER       = "user1"
@@ -80,7 +82,9 @@ def sync_to_azure():
             print(e)
         finally:
             client.shutdown()
-            connection.close()
+            try:
+                connection.close()
+            except: pass
     
         time.sleep(60)
 
