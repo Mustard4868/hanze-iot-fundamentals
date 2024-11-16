@@ -17,8 +17,10 @@ def get_env(env_key):
             if env_key in line:
                 key_value = line.split('=')[1].strip()
                 return key_value
+            
+SERVER_IP   = '192.168.2.149'
 
-MQTT_BROKER = '192.168.2.149'
+MQTT_BROKER = SERVER_IP
 MQTT_PORT   = 1883
 MQTT_USER   = 'user1'
 MQTT_TOPIC  = 'esp32/bme280'
@@ -34,7 +36,7 @@ while not wlan.isconnected():
     pass
 
 """SET TIME"""
-ntptime.host = 'nl.pool.ntp.org'
+ntptime.host = SERVER_IP
 ntptime.settime()
 
 """CONNECT TO MQTT"""
