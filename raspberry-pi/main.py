@@ -29,14 +29,17 @@ class Database:
         pass
 
     def connect(self) -> tuple[object, object]:
+        """Connect to the database, return obj:connection, obj:cursor"""
         connection = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=DB_NAME, connect_timeout=60)
         cursor = connection.cursor()
         return connection, cursor
     
     def close(self, connection) -> None:
+        """Close the database connection"""
         connection.close()
 
     def insert(self, device_id, temperature, pressure, humidity, timestamp, sync) -> None:
+        """Insert dataset into the local database"""
         try:
             connection, cursor = self.connect()
             query = f"INSERT INTO {DB_TABLE} (device_id, temperature, pressure, humidity, timestamp, sync) VALUES (%s, %s, %s, %s, %s, %s)"
@@ -52,17 +55,17 @@ class Database:
 class Mosquitto:
     def __init__(self) -> None:
         self.client = mqtt.Client()
-        self.client.on_connect = self.on_connect
-        self.client.on_message = self.on_message
+        self.client.on_connect = self.__on_connect
+        self.client.on_message = self.__on_message
         self.client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
         self.client.connect(MQTT_BROKER, MQTT_PORT, 60)
         self.mqtt_db = Database()
     
-    def on_connect(self, client, userdata, flags, rc) -> None:
+    def __on_connect(self, client, userdata, flags, rc) -> None:
         print("Connected with result code " + str(rc))
         self.client.subscribe(MQTT_TOPIC)
     
-    def on_message(self, client, userdata, msg) -> None:
+    def __on_message(self, client, userdata, msg) -> None:
         message = msg.payload.decode("utf-8")
         print(f"Received message: {message}")
         data = json.loads(message)
@@ -91,11 +94,12 @@ class Azure:
         self.client = IoTHubDeviceClient.create_from_connection_string(IOTHUB_DEVICE_CONNECTION_STRING)
     
     def send_message(self, message) -> bool:
+        """Send message to Azure IoT Hub"""
         msg = Message(json.dumps(message))
         msg.content_encoding = "utf-8"
         msg.content_type = "application/json"
 
-        try:
+        try:    # Attempt to send message to Azure IoT Hub, return True if successful else False
             self.client.send_message(msg)
             print("Message sent to Azure IoT Hub")
             return True
@@ -104,10 +108,24 @@ class Azure:
             return False
 
 def main():
+    """
+    Main code block, this block:
+    1. retrieves data from the MQTT broker.
+    2. attempts to send it to Azure IoT Hub.
+    3. updates the local database.
+    """
+
     mosquitto = Mosquitto()
     mosquitto.loop_forever()
 
 def sync():
+    """
+    Secondary code block, this block:
+    1. checks the local database for unsynchronized data.
+    2. attempts to send it to Azure IoT Hub.
+    3. updates the local database.
+    """
+
     db = Database()
     while True:
         connection, cursor = db.connect()
