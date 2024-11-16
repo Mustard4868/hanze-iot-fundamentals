@@ -1,36 +1,34 @@
 import pymysql
 import os
 import json
+import time
 
 import paho.mqtt.client as mqtt
+
 from azure.iot.device import IoTHubDeviceClient, Message
 from threading import Thread
-
 from dotenv import load_dotenv
 
 load_dotenv()
 
-SERVER_IP = "192.168.2.149"
-
+SERVER_IP       = "192.168.2.149"
 DB_HOST         = SERVER_IP
 DB_USER         = "user1"
 DB_PASSWORD     = os.getenv("DB_PASSWORD")
 DB_NAME         = "bme280"
 DB_TABLE        = "sensors"
-
 MQTT_BROKER     = SERVER_IP
 MQTT_PORT       = 1883
 MQTT_TOPIC      = "esp32/bme280"
 MQTT_USER       = "user1"
 MQTT_PASSWORD   = os.getenv("MQTT_PASSWORD")
-
 IOTHUB_DEVICE_CONNECTION_STRING = os.getenv("IOTHUB_DEVICE_CONNECTION_STRING")
 
 class Database:
     def __init__(self) -> None:
         pass
 
-    def connect(self) -> tuple:
+    def connect(self) -> tuple[object, object]:
         connection = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=DB_NAME, connect_timeout=60)
         cursor = connection.cursor()
         return connection, cursor
@@ -105,7 +103,47 @@ class Azure:
             print("Message not sent to Azure IoT Hub: ", e)
             return False
 
-if __name__ == "__main__":
-    azure = Azure()
+def main():
     mosquitto = Mosquitto()
     mosquitto.loop_forever()
+
+def sync():
+    db = Database()
+    while True:
+        connection, cursor = db.connect()
+        query = f"SELECT * FROM {DB_TABLE} WHERE sync = 0"
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        for row in rows:
+            row_dict = {
+                "device_id": row[0],
+                "temperature": row[1],
+                "pressure": row[2],
+                "humidity": row[3],
+                "timestamp": row[4].strftime("%Y-%m-%d %H:%M:%S"),
+                "sync": row[5]
+            }
+            row_json = json.dumps(row_dict)
+            
+            if azure.send_message(row_dict):
+                query = f"UPDATE {DB_TABLE} SET sync = 1 WHERE timestamp = '{row[4]}'"
+                cursor.execute(query)
+                connection.commit()
+
+        db.close(connection)
+        time.sleep(60)  # Check for unsynced data every 60 seconds
+        
+if __name__ == "__main__":
+    azure = Azure()
+
+    main_thread = Thread(target=main)
+    sync_thread = Thread(target=sync)
+
+    try:
+        main_thread.start()
+        sync_thread.start()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        main_thread.join()
+        sync_thread.join()
