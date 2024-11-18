@@ -1,10 +1,11 @@
+# https://github.com/mustard4868/hanze-iot-fundamentals
+# Monday, November 18, 2024
+
 import pymysql
 import os
 import json
 import time
-
 import paho.mqtt.client as mqtt
-
 from azure.iot.device import IoTHubDeviceClient, Message
 from threading import Thread
 from dotenv import load_dotenv
@@ -62,10 +63,19 @@ class Mosquitto:
         self.mqtt_db = Database()
     
     def __on_connect(self, client, userdata, flags, rc) -> None:
+        """
+        Print the connection status and subscribe to the mqtt topic
+        """
         print("Connected with result code " + str(rc))
         self.client.subscribe(MQTT_TOPIC)
     
     def __on_message(self, client, userdata, msg) -> None:
+        """
+        When a message is received on the mqtt topic:
+        * Decode the message.
+        * Send the message to Azure IoT Hub.
+        * Update the local database.
+        """
         message = msg.payload.decode("utf-8")
         print(f"Received message: {message}")
         data = json.loads(message)
@@ -113,6 +123,8 @@ def main():
     1. retrieves data from the MQTT broker.
     2. attempts to send it to Azure IoT Hub.
     3. updates the local database.
+    
+    These tasks are all handled by the Mosquitto class.
     """
 
     mosquitto = Mosquitto()
@@ -140,13 +152,13 @@ def sync():
                 "humidity": row[3],
                 "timestamp": row[4].strftime("%Y-%m-%d %H:%M:%S"),
                 "sync": row[5]
-            }
-            row_json = json.dumps(row_dict)
-            
+            }           
             if azure.send_message(row_dict):
                 query = f"UPDATE {DB_TABLE} SET sync = 1 WHERE timestamp = '{row[4]}'"
                 cursor.execute(query)
                 connection.commit()
+            else:
+                break   # Break ot of for loop in case of failure.
 
         db.close(connection)
         time.sleep(60)  # Check for unsynced data every 60 seconds
