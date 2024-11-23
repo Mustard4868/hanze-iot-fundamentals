@@ -1,0 +1,42 @@
+@startuml architecture
+skinparam componentStyle rectangle
+
+' ESP32 and its main script
+component [ESP32] as esp32 {
+  [main.py]
+}
+
+' BME280 sensor
+component [BME280] as bme280 {
+  [temperature]
+  [humidity]
+  [pressure]
+}
+
+' Raspberry Pi and its components
+component [Raspberry-Pi] as rpi {
+  [mosquitto]
+  [grafana]
+  [mysql]
+  [python]
+}
+
+' Azure components
+cloud Azure {
+  component [Azure SQL Database] as az_sql
+  component [IoT Hub] as az_iothub
+  component [Stream Analytics] as az_stream
+}
+
+' Connections
+esp32 <--[#blue]> bme280 : I2C Connection
+esp32 -[#green]> rpi : WiFi
+rpi ---[#orange]> az_iothub : Send Received Messages
+az_iothub -[#purple]> az_stream : Process Data
+az_stream -[#darkblue]> az_sql : Store Data
+mysql --> grafana : Visualize Data
+mosquitto --> python : Read Incoming Messages
+python --> mysql : Store Data Locally
+rpi --> mosquitto : Receive MQTT Messages
+
+@enduml
